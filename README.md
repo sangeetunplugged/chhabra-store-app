@@ -11,7 +11,7 @@ Hindi on top with English below, big buttons, works offline on an Android phone.
 - **Today's account:** totals by cash, UPI and udhaar, bill list with reprint and cancel, returns, day close against the galla, daily backup file.
 - **Owner settings (PIN):** shop details and UPI ID, printer, items and prices (300 items from the Stock List, with rack codes), practice or real mode, backup and restore.
 
-Practice mode and real mode keep separate data on the phone. Practice starts with sample prices and sample customers.
+Practice and real mode keep separate bills, khata and prices on the phone. Shop details, UPI ID, printer and learned barcodes are shared by both. Practice starts with sample prices and sample customers.
 
 ## Run it
 ```
@@ -31,7 +31,7 @@ Every push to `main` builds the app and publishes it with GitHub Pages (`.github
 Updates load by themselves the next time the app is opened with internet. Data on the phone is not touched by updates.
 
 ## Data
-All data stays on the phone (IndexedDB) until the cloud database is connected. Send the backup file every day from **Day close** or **Owner settings → Backup**.
+All data stays on the phone (IndexedDB) until the cloud database is connected. Send the backup file every day from **Day close** or **Owner settings → Backup**. A backup restores into the mode it came from, so a real backup restored on a new phone goes straight into the real accounts.
 
 ## Code map
 - `src/screens/` – Home, Bill (billing, loose, amount only, item finder), Pay (payment and done), Khata, Today (day, bills, returns, day close), Owner (settings)

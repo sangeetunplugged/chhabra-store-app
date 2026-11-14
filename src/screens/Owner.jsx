@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { go, ownerOk, refresh, say, bump, clearBill } from '../store.js';
-import { getSettings, setSettings, allItems, getItem, saveItem, mode, setMode, resetPractice } from '../db.js';
+import { getSettings, setSettings, allItems, getItem, saveItem, mode, switchMode as changeMode, resetPractice } from '../db.js';
 import { money, showName } from '../format.js';
 import { Icon, TopBar, Keypad, Sheet, Scanner, Empty } from '../ui.jsx';
 import { btPair, printBill, testBill, beep } from '../printing.js';
@@ -75,9 +75,9 @@ export function Owner() {
 
   const practice = mode.value === 'practice';
 
-  function switchMode() {
+  async function switchMode() {
     clearBill();
-    setMode(practice ? 'real' : 'practice');
+    await changeMode(practice ? 'real' : 'practice');
     setAsk('');
     bump();
     say(practice ? 'असली हिसाब शुरू · Real accounts on' : 'अभ्यास मोड · Practice mode on');
@@ -131,7 +131,7 @@ export function Owner() {
             <div>
               <h2>{practice ? 'असली हिसाब शुरू करें?' : 'अभ्यास मोड पर जाएं?'}</h2>
               <p class="muted">{practice
-                ? 'Real bills, khata and day close start from zero. Practice data stays separate. Set the UPI ID and prices first.'
+                ? 'Real bills, khata and day close start from zero. Shop details, UPI ID, printer and learned barcodes come along. Practice prices stay behind: set real prices in Items, or the app asks each one once.'
                 : 'Real data stays safe. Practice uses its own sample data.'}</p>
             </div>
             <button type="button" class="icon-btn" aria-label="बंद करें · Close" onClick={() => setAsk('')}><Icon name="x" /></button>
@@ -406,7 +406,7 @@ export function Backup() {
       const data = await restoreBackup(file);
       clearBill();
       bump();
-      setMsg('वापस आ गया · Restored backup from ' + new Date(data.at).toLocaleString('en-IN'));
+      setMsg('वापस आ गया · Restored ' + (data.mode === 'real' ? 'real' : 'practice') + ' backup from ' + new Date(data.at).toLocaleString('en-IN'));
       setFile(null);
     } catch (e) {
       setMsg('यह बैकअप फ़ाइल नहीं है · Not a Chhabra Store backup file');
@@ -423,7 +423,7 @@ export function Backup() {
         <input type="file" accept="application/json,.json" onChange={(e) => setFile(e.currentTarget.files[0] || null)} />
       </label>
       {file && (
-        <button type="button" class="btn dark" onClick={restore}><b>वापस लाएं</b><small>Restore: replaces the {mode.value} data on this phone</small></button>
+        <button type="button" class="btn dark" onClick={restore}><b>वापस लाएं</b><small>Restore: replaces this phone's data for the backup's mode (real or practice)</small></button>
       )}
       {msg && <p class="note center">{msg}</p>}
     </main>

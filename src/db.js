@@ -89,11 +89,16 @@ function readMode() {
 export const mode = signal(readMode());
 const dbs = {};
 
-export function db() {
-  const m = mode.value;
+function dbFor(m) {
   if (!dbs[m]) dbs[m] = openDb(m === 'real' ? 'chhabra-real' : 'chhabra-practice', m !== 'real');
   return dbs[m];
 }
+
+export function db() {
+  return dbFor(mode.value);
+}
+
+const otherMode = () => (mode.value === 'real' ? 'practice' : 'real');
 
 export function setMode(m) {
   try {
@@ -104,12 +109,58 @@ export function setMode(m) {
   mode.value = m;
 }
 
-export async function resetPractice() {
-  if (dbs.practice) {
-    dbs.practice.close();
-    delete dbs.practice;
+// Shop setup is shared by both modes: set it once, in either mode, and it holds in both.
+// Barcodes learned in practice count in real too. Bills, khata, prices and the bill number stay apart.
+const SHARED = ['shopName', 'shopNameHi', 'address', 'phone', 'upiId', 'upiName', 'printer', 'autoPrint'];
+
+async function addBarcodes(d, id, codes, drop = []) {
+  const it = await d.items.get(id);
+  if (!it) return;
+  const set = new Set(it.barcodes || []);
+  const before = [...set].join('|');
+  codes.forEach((c) => set.add(String(c)));
+  drop.forEach((c) => set.delete(String(c)));
+  if ([...set].join('|') !== before) await d.items.update(id, { barcodes: [...set] });
+}
+
+// Copies the shop setup and learned barcodes from one mode's database to the other's.
+// Covers anything set before both databases existed, or before this was added.
+async function carryOver(from, to) {
+  const src = dbFor(from);
+  const dst = dbFor(to);
+  const rows = (await src.settings.toArray()).filter((r) => SHARED.includes(r.key));
+  if (rows.length) await dst.settings.bulkPut(rows);
+  const target = new Map((await dst.items.toArray()).map((x) => [x.id, x]));
+  const changed = [];
+  (await src.items.toArray()).forEach((it) => {
+    const t = target.get(it.id);
+    if (!t || !(it.barcodes && it.barcodes.length)) return;
+    const set = new Set(t.barcodes || []);
+    const n = set.size;
+    it.barcodes.forEach((c) => set.add(c));
+    if (set.size !== n) changed.push({ ...t, barcodes: [...set] });
+  });
+  if (changed.length) await dst.items.bulkPut(changed);
+}
+
+export async function switchMode(m) {
+  if (m === mode.value) return;
+  try {
+    await carryOver(mode.value, m);
+  } catch (e) {
+    /* the switch still works; the setup can be entered again */
   }
-  await Dexie.delete('chhabra-practice');
+  setMode(m);
+}
+
+export async function resetPractice() {
+  await dbFor('practice').delete();
+  delete dbs.practice;
+  try {
+    await carryOver('real', 'practice');
+  } catch (e) {
+    /* practice starts with the default setup */
+  }
 }
 
 // ---------- settings ----------
@@ -122,23 +173,31 @@ export async function getSettings() {
   return s;
 }
 
-export function setSettings(obj) {
-  return db().settings.bulkPut(Object.entries(obj).map(([key, value]) => ({ key, value })));
+export async function setSettings(obj) {
+  const rows = Object.entries(obj).map(([key, value]) => ({ key, value }));
+  await db().settings.bulkPut(rows);
+  const shared = rows.filter((r) => SHARED.includes(r.key));
+  if (shared.length) await dbFor(otherMode()).settings.bulkPut(shared);
 }
 
 // ---------- items ----------
 export const allItems = () => db().items.toArray();
 export const getItem = (id) => db().items.get(id);
 export const findByBarcode = (code) => db().items.where('barcodes').equals(String(code)).first();
-export const saveItem = (it) => db().items.put(it);
 export const setPrice = (id, price) => db().items.update(id, { price });
 
+export async function saveItem(it) {
+  const d = db();
+  const before = await d.items.get(it.id);
+  await d.items.put(it);
+  const now = new Set(it.barcodes || []);
+  const removed = ((before && before.barcodes) || []).filter((c) => !now.has(c));
+  await addBarcodes(dbFor(otherMode()), it.id, [...now], removed);
+}
+
 export async function linkBarcode(id, code) {
-  const it = await db().items.get(id);
-  if (!it) return;
-  const set = new Set(it.barcodes || []);
-  set.add(String(code));
-  await db().items.update(id, { barcodes: [...set] });
+  await addBarcodes(db(), id, [code]);
+  await addBarcodes(dbFor(otherMode()), id, [code]);
 }
 
 // ---------- bills ----------
@@ -274,13 +333,23 @@ export async function exportAll() {
   return out;
 }
 
+// A backup goes back into the mode it came from, so a real backup restored on a new
+// phone (which starts in practice) lands in the real accounts, and the app switches there.
 export async function importAll(data) {
   if (!data || data.app !== 'chhabra-store') throw new Error('not a Chhabra Store backup');
-  const d = db();
+  const target = data.mode === 'real' || data.mode === 'practice' ? data.mode : mode.value;
+  const d = dbFor(target);
   await d.transaction('rw', d.tables, async () => {
     for (const t of d.tables) {
       await t.clear();
       if (Array.isArray(data[t.name])) await t.bulkAdd(data[t.name]);
     }
   });
+  try {
+    await carryOver(target, target === 'real' ? 'practice' : 'real');
+  } catch (e) {
+    /* the restored mode is complete on its own */
+  }
+  setMode(target);
+  return target;
 }
