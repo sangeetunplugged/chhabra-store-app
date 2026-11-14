@@ -37,12 +37,13 @@ Data lives on the phone (IndexedDB), so billing never waits for the internet. On
 - Project `chhabra-store` (free Spark plan). Firestore database in `asia-south2` (Delhi). Email/Password sign-in with new sign-ups blocked.
 - Logins are made by Rajan in the Firebase console (Authentication → Users → Add user) as `<name>@chhabra-store.firebaseapp.com`:
   - `counter` for the shop phone: it uploads.
-  - `rajan` for Rajan's phone: view only.
-  In the app, go to **Owner settings → Cloud** and type just `counter` or `rajan` with the password.
+  - `stock` for the brother's phone: stock and suppliers.
+  - `rajan` for Rajan's phone: Shop live and Accounts; it can add expenses.
+  In the app, go to **Owner settings → Cloud** and type just `counter`, `stock` or `rajan` with the password.
 - The counter phone uploads **real data only**: bills, khata entries, customers with their balance, returns, day closes, items and shop settings. Each change goes into an outbox in the same database step and is sent in batches when online. Practice data never leaves the phone.
 - Only one phone can be the counter. If a new phone signs in as `counter`, it offers to take over: it pulls the cloud copy, and the old phone stops uploading and says so.
 - Any other login sees **Shop live**: any day's sales (cash, UPI, udhaar), bills with their items, khata balances, and when the counter phone last synced.
-- `firestore.rules`: shop logins can read; only `counter` can write. Publish them from the console (Firestore → Rules) or with `firebase deploy --only firestore:rules`.
+- `firestore.rules`: shop logins can read. Only `counter` writes sales data; `stock` and `counter` add stock moves, suppliers and khata lines; any shop login adds expenses and owner notes. Publish them from the console (Firestore → Rules) or with `firebase deploy --only firestore:rules`.
 - To test against the Firebase emulators, build with `VITE_FIREBASE_EMULATOR=127.0.0.1 npx vite build --outDir dist-emu` and run `firebase emulators:start --only auth,firestore`.
 
 ## Stock (Phase 2, part 1)
@@ -72,6 +73,17 @@ Data lives on the phone (IndexedDB), so billing never waits for the internet. On
 - **Cash paid from the galla** counts in the counter's Today's account and day close, and in Shop live, so the galla still matches.
 - Cloud: `vendors`, `vledger` (khata lines, never edited) and `photos`. Rules: stock and counter logins add these; everyone signed in can read.
 
+## Accounts (Phase 3)
+- **Rajan's phone → हिसाब-किताब · Accounts**, month by month:
+  - **Profit:** sales (cash, UPI, udhaar), cost of goods at the latest buy rates, gross profit, expenses and net profit. Sales of items with no buy rate yet are left out of the cost, and the gross is scaled from the items that have one; the screen says what share of sales that covers. It also shows what was bought from suppliers and paid to them.
+  - **Daily sales** bars, with the best day.
+  - **GST watch:** sales this financial year (1 April to 31 March) against the ₹20 lakh limit, where they land by 31 March at the current daily average, and the day they would cross it. Sales from before the app are typed in once (kept at `owner/gst`).
+  - **Udhaar by age:** 0–30, 31–60, 61–90 and 90+ days, counted from the oldest unpaid udhaar (payments clear the oldest first). Each customer has a WhatsApp reminder button.
+  - **Expenses:** rent, electricity, salary, transport and loading, tea and snacks, repairs, other; paid from the galla, other cash, UPI or bank. A line can be undone within a day.
+- **Counter phone:** **+ खर्चा** on Today's account adds an expense paid from the galla. Like supplier payments, it comes off the expected galla in Today, Day close and Shop live.
+- **Day close → राजन को हिसाब भेजें:** sends the day's summary (bills, sales split, khata received, returns, galla payouts, whether the galla matched, shelves to fill and items to order) to Rajan's WhatsApp. Set the number once in **Owner settings → Shop → Owner's WhatsApp**.
+- Cloud: `expenses` (never edited; undo adds a line) and `owner` (notes such as the GST figure). Customers now carry `since` (oldest unpaid udhaar) and `lastPay`, and each day's sales doc carries the day's totals.
+
 ## Code map
 - `src/screens/` – Home, Bill (billing, loose, amount only, item finder), Pay (payment and done), Khata, Today (day, bills, returns, day close), Owner (settings)
 - `src/db.js` – local database, practice and real, with the upload outbox
@@ -82,5 +94,7 @@ Data lives on the phone (IndexedDB), so billing never waits for the internet. On
 - `src/screens/Stock.jsx` – stock screens: hub, goods in and out, item, counting, lists
 - `src/vendorCalc.js` – what is owed, dues (oldest bill first), buy rates by supplier, galla payouts
 - `src/screens/Vendors.jsx` – supplier list, supplier page and khata, bill with photo, add/edit supplier
+- `src/accountsCalc.js` – month profit, GST watch, udhaar ageing (plain functions)
+- `src/screens/Accounts.jsx` – Accounts screen, the expense sheet, the day-close WhatsApp text
 - `src/printing.js` – ESC/POS receipt, Bluetooth and RawBT printing, WhatsApp text, UPI link
 - `src/catalog.json` – the 300 items from the Stock List, with Hindi names and rack codes

@@ -15,7 +15,7 @@ import {
   query, where, runTransaction, serverTimestamp, onSnapshot, Timestamp, persistentLocalCache, persistentMultipleTabManager
 } from 'firebase/firestore';
 import { firebaseConfig } from './firebase-config.js';
-import { realDb, onOutbox, markAll, markSalesDays, replaceReal, salesDoc, SYNC_TABLES, NUMBER_KEYS, customerBalance, setMode } from './db.js';
+import { realDb, onOutbox, markAll, markSalesDays, markForPhase3, replaceReal, salesDoc, customerAgeing, SYNC_TABLES, NUMBER_KEYS, customerBalance, setMode } from './db.js';
 import { cloud, LOGIN_KEY, DOMAIN, roleOf } from './cloudState.js';
 
 const SHOP = 'shops/chhabra';
@@ -159,6 +159,10 @@ export async function start() {
       await markSalesDays();
       localStorage.setItem('chhabra-sales-v1', '1');
     }
+    if (localStorage.getItem('chhabra-phase3') !== '1') {
+      await markForPhase3();
+      localStorage.setItem('chhabra-phase3', '1');
+    }
   } catch (e) {
     /* sales days go up with the next bills */
   }
@@ -274,7 +278,7 @@ async function toDoc(d, t, rec) {
   if (t === 'sales') return salesDoc(d, rec.day);
   if (t === 'settings') return { value: rec.value === undefined ? null : rec.value };
   const x = JSON.parse(JSON.stringify(rec)); // Firestore takes no undefined values
-  if (t === 'customers') x.balance = await customerBalance(d, rec.id);
+  if (t === 'customers') Object.assign(x, { balance: await customerBalance(d, rec.id) }, await customerAgeing(d, rec.id));
   return x;
 }
 
@@ -347,7 +351,7 @@ async function flush() {
 // ---------- reading (Shop live) ----------
 // Calls back with the day's records from the cloud whenever they change. Returns a stop function.
 export function watchDay(day, cb, onError) {
-  const parts = { bills: [], ledger: [], rets: [], vledger: [], close: null, meta: null, openingCash: 0, ready: 0 };
+  const parts = { bills: [], ledger: [], rets: [], vledger: [], expenses: [], close: null, meta: null, openingCash: 0, ready: 0 };
   const emit = () => cb({ ...parts });
   const fail = (e) => onError && onError(errText(e));
   const byDay = (t, k) =>
@@ -361,6 +365,7 @@ export function watchDay(day, cb, onError) {
     byDay('ledger', 'ledger'),
     byDay('returns', 'rets'),
     byDay('vledger', 'vledger'),
+    byDay('expenses', 'expenses'),
     onSnapshot(doc(fs, SHOP, 'closes', day), (s) => {
       parts.close = s.exists() ? s.data() : null;
       emit();
@@ -402,7 +407,9 @@ export async function watchStock(onData, since) {
     onSnapshot(q('sales', s.sales), (snap) => onData({ sales: changed(snap, 'day') }), fail),
     onSnapshot(q('items', s.items), (snap) => onData({ items: changed(snap, 'id') }), fail),
     onSnapshot(q('vendors', s.vendors), (snap) => onData({ vendors: changed(snap, 'id') }), fail),
-    onSnapshot(q('vledger', s.vledger), (snap) => onData({ vledger: changed(snap, 'id') }), fail)
+    onSnapshot(q('vledger', s.vledger), (snap) => onData({ vledger: changed(snap, 'id') }), fail),
+    onSnapshot(q('customers', s.customers), (snap) => onData({ customers: changed(snap, 'id').map((c) => ({ ...c, id: Number(c.id) })) }), fail),
+    onSnapshot(q('expenses', s.expenses), (snap) => onData({ expenses: changed(snap, 'id') }), fail)
   ];
   return () => stops.forEach((f) => f());
 }
@@ -436,4 +443,20 @@ export async function getPhoto(id) {
 // Cash paid to suppliers from the galla on one day (for Shop live).
 export function watchGalla(day, cb) {
   return onSnapshot(query(collection(fs, SHOP, 'vledger'), where('day', '==', day)), (s) => cb(s.docs.map((x) => x.data())), () => {});
+}
+
+// ---------- accounts ----------
+export function addExpense(e) {
+  const { sat, ...rest } = e;
+  return setDoc(doc(fs, SHOP, 'expenses', e.id), { ...rest, sat: serverTimestamp() });
+}
+
+// Owner notes kept in the cloud, e.g. this year's sales from before the app (for the GST watch).
+export async function getOwner(id) {
+  const s = await getDoc(doc(fs, SHOP, 'owner', id));
+  return s.exists() ? s.data() : null;
+}
+
+export function setOwner(id, data) {
+  return setDoc(doc(fs, SHOP, 'owner', id), { ...data, sat: serverTimestamp() }, { merge: true });
 }

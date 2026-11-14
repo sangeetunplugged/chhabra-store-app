@@ -436,3 +436,28 @@ h1, h2, p { margin: 0; }
 .group-head { display: flex; align-items: center; gap: 10px; padding: 6px 16px; }
 .group-head .two { flex: 1; }
 a.btn { text-decoration: none; color: inherit; }
+
+/* accounts */
+.btn.live-hero.accounts-hero { background: var(--brown); }
+.btn.live-hero.accounts-hero .two small { color: var(--brown-tint); }
+.top-gap { margin-top: 10px; }
+.stack { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 0; }
+.sum-row.bare { border: 0; min-height: 34px; padding: 0; font-size: 16px; }
+.meter { height: 14px; border-radius: 999px; background: var(--divider); overflow: hidden; }
+.meter span { display: block; height: 100%; border-radius: 999px; background: var(--green); }
+.meter span.wait { background: #d97706; }
+.meter span.bad { background: var(--red); }
+.age-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.age { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); line-height: 1.1; }
+.age b { font-size: 16px; }
+.age small { font-size: 12px; color: var(--muted); }
+.age.old { border-color: #fca5a5; background: var(--red-tint); }
+.age.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.bars-card { margin: 0 16px; padding: 12px; border-radius: 16px; background: var(--card); border: 1.5px solid var(--line); }
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 110px; }
+.bars span { flex: 1; min-width: 2px; background: var(--blue); border-radius: 3px 3px 0 0; opacity: 0.85; }
+.bars span.today { background: var(--green); opacity: 1; }
+.bars-foot { display: flex; justify-content: space-between; margin-top: 6px; }
+.bars-foot small { font-size: 12px; color: var(--muted); }
+.top-gap .btn { width: 100%; }
+.sum-row b { white-space: nowrap; }

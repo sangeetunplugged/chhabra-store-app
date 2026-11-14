@@ -11,6 +11,7 @@ import { Owner, Shop, Printer, Items, Item, Backup, Pin } from './screens/Owner.
 import { Cloud, Live } from './screens/Cloud.jsx';
 import { Stock, StockPick, StockItem, StockCount, StockList } from './screens/Stock.jsx';
 import { Vendors, Vendor, VendorEdit } from './screens/Vendors.jsx';
+import { Accounts } from './screens/Accounts.jsx';
 
 const SCREENS = {
   home: Home, bill: Bill, loose: Loose, quick: Quick, find: Find,
@@ -20,7 +21,8 @@ const SCREENS = {
   owner: Owner, shop: Shop, printer: Printer, items: Items, item: Item, backup: Backup, pin: Pin,
   cloud: Cloud, live: Live,
   stock: Stock, stockPick: StockPick, stockItem: StockItem, stockCount: StockCount, stockList: StockList,
-  vendors: Vendors, vendor: Vendor, vendorEdit: VendorEdit
+  vendors: Vendors, vendor: Vendor, vendorEdit: VendorEdit,
+  accounts: Accounts
 };
 
 export function App() {

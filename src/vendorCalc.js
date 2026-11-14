@@ -88,10 +88,12 @@ export function vendorOfItem(vendors, moves) {
   return M;
 }
 
-// Cash paid to suppliers from the shop's cash drawer (galla) on one day: lowers the cash expected there.
-export function gallaPaid(vledger, day) {
-  const undone = new Set(vledger.filter((e) => e.kind === 'undo' && e.ref).map((e) => e.ref));
-  return vledger
-    .filter((e) => e.kind === 'payment' && e.mode === 'galla' && e.day === day && !undone.has(e.id))
-    .reduce((a, e) => a + (Number(e.amount) || 0), 0);
+// Cash paid out of the shop's cash drawer (galla) on one day, to suppliers and for expenses:
+// it lowers the cash expected in the galla.
+export function gallaPaid(vledger, day, expenses = []) {
+  const sum = (list, ok) => {
+    const undone = new Set(list.filter((e) => e.kind === 'undo' && e.ref).map((e) => e.ref));
+    return list.filter((e) => ok(e) && e.mode === 'galla' && e.day === day && !undone.has(e.id)).reduce((a, e) => a + (Number(e.amount) || 0), 0);
+  };
+  return sum(vledger, (e) => e.kind === 'payment') + sum(expenses, (e) => e.kind !== 'undo');
 }

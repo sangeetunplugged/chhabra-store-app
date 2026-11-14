@@ -29,7 +29,8 @@ export function qtyText(n, it) {
 export const stockCat = signal(''); // the category chip picked on the stock screens
 export const stockData = signal({
   ready: false, items: new Map(), st: new Map(), firstSaleDay: '', moves: [], error: '',
-  vendors: [], vledger: [], V: new Map(), rates: new Map(), itemVendor: new Map()
+  vendors: [], vledger: [], V: new Map(), rates: new Map(), itemVendor: new Map(),
+  sales: [], customers: [], expenses: []
 });
 
 let cache = null;
@@ -38,6 +39,7 @@ function db() {
     cache = new Dexie('chhabra-cloudcache');
     cache.version(1).stores({ moves: 'id, sat, at, item', sales: 'day, sat', items: 'id, sat' });
     cache.version(2).stores({ vendors: 'id, sat', vledger: 'id, sat, vendor, day' });
+    cache.version(3).stores({ customers: 'id, sat', expenses: 'id, sat, day' });
   }
   return cache;
 }
@@ -70,14 +72,16 @@ async function since() {
     const x = await d.table(t).orderBy('sat').last();
     return x && x.sat ? x.sat : 0;
   };
-  return { moves: await last('moves'), sales: await last('sales'), items: await last('items'), vendors: await last('vendors'), vledger: await last('vledger') };
+  const out = {};
+  for (const t of ['moves', 'sales', 'items', 'vendors', 'vledger', 'customers', 'expenses']) out[t] = await last(t);
+  return out;
 }
 
 async function onRemote(part) {
   const d = db();
   try {
-    await d.transaction('rw', [d.moves, d.sales, d.items, d.vendors, d.vledger], async () => {
-      for (const t of ['moves', 'sales', 'items', 'vendors', 'vledger']) {
+    await d.transaction('rw', [d.moves, d.sales, d.items, d.vendors, d.vledger, d.customers, d.expenses], async () => {
+      for (const t of ['moves', 'sales', 'items', 'vendors', 'vledger', 'customers', 'expenses']) {
         if (part[t] && part[t].length) await d.table(t).bulkPut(part[t]);
       }
     });
@@ -94,8 +98,8 @@ function schedule() {
 
 export async function recompute() {
   const d = db();
-  const [moves, sales, cloudItems, vendors, vledger] = await Promise.all([
-    d.moves.toArray(), d.sales.toArray(), d.items.toArray(), d.vendors.toArray(), d.vledger.toArray()
+  const [moves, sales, cloudItems, vendors, vledger, customers, expenses] = await Promise.all([
+    d.moves.toArray(), d.sales.toArray(), d.items.toArray(), d.vendors.toArray(), d.vledger.toArray(), d.customers.toArray(), d.expenses.toArray()
   ]);
   const items = new Map(catalog.map((it) => [it.id, it]));
   for (const it of cloudItems) items.set(it.id, { ...(items.get(it.id) || {}), ...it });
@@ -105,7 +109,8 @@ export async function recompute() {
   const V = computeVendors({ vendors, vledger, moves, today });
   stockData.value = {
     ready: true, items, st, firstSaleDay, moves, error: '',
-    vendors, vledger, V, rates: ratesByItem(moves), itemVendor: vendorOfItem(vendors, moves)
+    vendors, vledger, V, rates: ratesByItem(moves), itemVendor: vendorOfItem(vendors, moves),
+    sales, customers, expenses
   };
 }
 
@@ -195,4 +200,14 @@ export async function shrinkPhoto(file) {
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+// An expense (rent, electricity, salary...). Never edited; a mistake is undone with a new line.
+export async function saveExpense(e) {
+  const rec = { id: newId(), at: Date.now(), day: dayKey(), by: cloud.value.login || '', sat: 0, ...e };
+  await db().expenses.put(rec);
+  schedule();
+  const api = await cloudApi();
+  api.addExpense(rec).catch((err) => (stockData.value = { ...stockData.value, error: api.errText(err) }));
+  return rec;
 }

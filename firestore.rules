@@ -34,6 +34,14 @@ service cloud.firestore {
       allow read: if shopLogin();
       allow create: if stockWriter() && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
     }
+    // Accounts: any shop login records an expense (never changed afterwards) and the owner's notes.
+    match /shops/chhabra/expenses/{id} {
+      allow read: if shopLogin();
+      allow create: if shopLogin() && request.resource.data.amount is number && request.resource.data.cat is string;
+    }
+    match /shops/chhabra/owner/{id} {
+      allow read, write: if shopLogin();
+    }
     match /shops/chhabra/{document=**} {
       allow read: if shopLogin();
       allow write: if counter();

@@ -6,7 +6,7 @@
 import Dexie from 'dexie';
 import { signal } from '@preact/signals';
 import catalog from './catalog.json';
-import { dayKey } from './format.js';
+import { dayKey, lineTotal } from './format.js';
 
 const PRACTICE_PRICES = {
   'milk-full-cream-toned-500-ml-pouch': 35,
@@ -34,6 +34,7 @@ export const DEFAULTS = {
   shopNameHi: 'छाबड़ा स्टोर',
   address: 'Patel Nagar, Panipat',
   phone: '',
+  ownerPhone: '', // Rajan's WhatsApp, for the day-close summary
   upiId: '',
   upiName: 'Chhabra Store',
   printer: 'none', // none | bluetooth | rawbt | system
@@ -165,21 +166,69 @@ export async function markSalesDays() {
   });
 }
 
-// What each item sold on one day: packs by count, loose items in kg. Amount-only lines have no item.
+// One day's sales for the cloud: what each item sold (packs by count, loose items in kg) and earned,
+// and the day's totals. Amount-only lines have no item; they count in the totals as "quick".
 export async function salesDoc(d, day) {
   const bills = await d.bills.where('day').equals(day).toArray();
   const items = {};
+  const rev = {};
+  const r = (x) => Math.round(x * 1000) / 1000;
   let n = 0;
+  let total = 0;
+  let cash = 0;
+  let upi = 0;
+  let udhaar = 0;
+  let quick = 0;
   for (const b of bills) {
     if (b.status !== 'done') continue;
     n++;
+    total += Number(b.total) || 0;
+    cash += (b.pay && b.pay.cash) || 0;
+    upi += (b.pay && b.pay.upi) || 0;
+    udhaar += (b.pay && b.pay.udhaar) || 0;
     for (const l of b.lines || []) {
-      if (!l.itemId || l.quick) continue;
+      if (l.quick || !l.itemId) {
+        quick += lineTotal(l);
+        continue;
+      }
       const q = l.loose ? (Number(l.grams) || 0) / 1000 : Number(l.qty) || 0;
-      items[l.itemId] = Math.round(((items[l.itemId] || 0) + q) * 1000) / 1000;
+      items[l.itemId] = r((items[l.itemId] || 0) + q);
+      rev[l.itemId] = r((rev[l.itemId] || 0) + lineTotal(l));
     }
   }
-  return { day, items, bills: n };
+  return { day, items, rev, bills: n, total, cash, upi, udhaar, quick };
+}
+
+// How old a customer's udhaar is: payments clear the oldest udhaar first; "since" is the day of the
+// oldest udhaar still unpaid, "lastPay" the day of the last payment.
+export async function customerAgeing(d, id) {
+  const all = (await d.ledger.where('customerId').equals(id).toArray()).sort((a, b) => a.at - b.at);
+  const debits = [];
+  let credit = 0;
+  let lastPay = '';
+  for (const e of all) {
+    if (e.amount > 0) debits.push({ day: e.day, left: e.amount });
+    else {
+      credit += -e.amount;
+      if (e.type === 'payment' && e.day > lastPay) lastPay = e.day;
+    }
+  }
+  for (const x of debits) {
+    const t = Math.min(x.left, credit);
+    x.left -= t;
+    credit -= t;
+  }
+  const open = debits.find((x) => x.left > 0);
+  return { since: open ? open.day : '', lastPay };
+}
+
+// One-time: send every sales day and customer again (for the totals and ageing added in Phase 3).
+export async function markForPhase3() {
+  const d = realDb();
+  await d.transaction('rw', d.bills, d.customers, d.outbox, async () => {
+    await mark(d, 'sales', await saleDays(d));
+    await mark(d, 'customers', await d.customers.toCollection().primaryKeys());
+  });
 }
 
 // Replace the real data with a copy from the cloud (a new counter phone). Nothing is queued:
@@ -208,7 +257,7 @@ export async function customerBalance(d, id) {
 // ---------- shared setup between modes ----------
 // Shop setup is shared by both modes: set it once, in either mode, and it holds in both.
 // Barcodes learned in practice count in real too. Bills, khata, prices and the bill number stay apart.
-const SHARED = ['shopName', 'shopNameHi', 'address', 'phone', 'upiId', 'upiName', 'printer', 'autoPrint'];
+const SHARED = ['shopName', 'shopNameHi', 'address', 'phone', 'ownerPhone', 'upiId', 'upiName', 'printer', 'autoPrint'];
 
 async function addBarcodes(d, id, codes, drop = []) {
   await d.transaction('rw', d.items, d.outbox, async () => {

@@ -64,6 +64,12 @@ export function Home() {
           <span class="two"><b>दुकान लाइव</b><small>Shop live · today's real sales and khata from the cloud</small></span>
         </button>
       )}
+      {cloud.value.role === 'viewer' && (
+        <button type="button" class="btn live-hero accounts-hero" onClick={() => go('accounts')}>
+          <Icon name="book" size={30} />
+          <span class="two"><b>हिसाब-किताब</b><small>Accounts · profit, GST watch, old udhaar, expenses</small></span>
+        </button>
+      )}
 
       <button type="button" class="btn primary hero" onClick={newBill}>
         <Icon name="plus" size={40} stroke={2.5} />

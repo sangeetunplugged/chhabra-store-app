@@ -9,14 +9,19 @@ import { Receipt } from './Pay.jsx';
 import { cloud } from '../cloudState.js';
 import { stockData, ensureStock } from '../stockState.js';
 import { gallaPaid } from '../vendorCalc.js';
+import { lists } from '../stockCalc.js';
+import { ExpenseSheet, closeSummaryText } from './Accounts.jsx';
+import { openWhatsApp as sendWa } from '../printing.js';
 
-// Cash the brother paid suppliers out of the galla (needs the cloud; 0 without it).
+const cloudOn = () => !!cloud.value.login && !['signedout', 'off'].includes(cloud.value.status);
+
+// Cash paid out of the galla to suppliers and for expenses (needs the cloud; 0 without it).
 function useGallaPaid(day) {
-  const on = !!cloud.value.login && !['signedout', 'off'].includes(cloud.value.status);
+  const on = cloudOn();
   useEffect(() => {
     if (on) ensureStock();
   }, [on]);
-  return on && stockData.value.ready ? gallaPaid(stockData.value.vledger, day) : 0;
+  return on && stockData.value.ready ? gallaPaid(stockData.value.vledger, day, stockData.value.expenses) : 0;
 }
 
 function shiftDay(day, n) {
@@ -41,6 +46,7 @@ export function Today({ day: dayParam }) {
     daySummary(day).then(setS);
   }, [day, refresh.value, mode.value]);
   const paidOut = useGallaPaid(day);
+  const [exp, setExp] = useState(false);
 
   const isToday = day === today;
   return (
@@ -66,7 +72,7 @@ export function Today({ day: dayParam }) {
               <div class="sum-row"><span>वापसी · Returns</span><b>− {money(s.returnsCash + s.returnsKhata)}</b></div>
             )}
             {paidOut > 0 && (
-              <div class="sum-row"><span>सप्लायर को दिए (गल्ले से) · Paid to vendors from the galla</span><b>− {money(paidOut)}</b></div>
+              <div class="sum-row"><span>गल्ले से दिए (सप्लायर, खर्चा) · Paid from the galla (vendors, expenses)</span><b>− {money(paidOut)}</b></div>
             )}
           </div>
           <div class="galla">
@@ -84,6 +90,11 @@ export function Today({ day: dayParam }) {
               <button type="button" class="btn outline" onClick={() => go('returnNew')}><b>वापसी</b><small>Return / refund</small></button>
             </div>
           )}
+          {isToday && cloudOn() && mode.value === 'real' && (
+            <div class="pad-x top-gap">
+              <button type="button" class="btn outline" onClick={() => setExp(true)}><b>+ खर्चा</b><small>Expense paid from the galla (tea, transport…)</small></button>
+            </div>
+          )}
           <h2 class="section-title">बिल · Bills</h2>
           <div class="entries">
             {s.list.length === 0 && <Empty hi="इस दिन कोई बिल नहीं" en="No bills this day" />}
@@ -99,8 +110,13 @@ export function Today({ day: dayParam }) {
           </div>
         </>
       )}
+      <TodayExpense open={exp} onClose={() => setExp(false)} />
     </main>
   );
+}
+
+function TodayExpense({ open, onClose }) {
+  return open ? <ExpenseSheet onClose={onClose} defaultMode="galla" /> : null;
 }
 
 const CANCEL_REASONS = [
@@ -235,7 +251,11 @@ export function Close() {
   const [counted, setCounted] = useState('');
   const [field, setField] = useState('counted');
   const [saved, setSaved] = useState(false);
+  const [st, setSt] = useState(null);
   const paidOut = useGallaPaid(day);
+  useEffect(() => {
+    getSettings().then(setSt);
+  }, []);
   useEffect(() => {
     daySummary(day).then((r) => {
       setS(r);
@@ -255,6 +275,13 @@ export function Close() {
     beep(diff === 0);
     bump();
     setSaved(true);
+  }
+
+  function sendSummary() {
+    const sd = stockData.value;
+    const L = sd.ready ? lists({ items: sd.items, st: sd.st }) : null;
+    const text = closeSummaryText({ day, s, paidOut, close: { expected, counted: c, diff }, fill: L ? L.fill.length : null, order: L ? L.order.length : null, st: st || {} });
+    sendWa(text, st && st.ownerPhone);
   }
 
   async function backup() {
@@ -288,7 +315,10 @@ export function Close() {
       {!saved ? (
         <button type="button" class="btn dark big" disabled={counted === ''} onClick={save}><b>दिन बंद करें</b><small>Save day close</small></button>
       ) : (
-        <button type="button" class="btn green big" onClick={backup}><b>बैकअप भेजें</b><small>Send today's backup (WhatsApp or Drive)</small></button>
+        <>
+          <button type="button" class="btn green big" onClick={sendSummary}><b>राजन को हिसाब भेजें</b><small>Send today's summary on WhatsApp{st && st.ownerPhone ? '' : ' (set the number in owner settings → Shop)'}</small></button>
+          <button type="button" class="btn outline" onClick={backup}><b>बैकअप भेजें</b><small>Send today's backup file (WhatsApp or Drive)</small></button>
+        </>
       )}
     </main>
   );

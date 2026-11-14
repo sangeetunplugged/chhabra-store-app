@@ -188,7 +188,7 @@ export function Shop() {
       say('UPI ID ऐसा हो: naam@bank · UPI ID looks like name@bank');
       return;
     }
-    await setSettings({ shopName: f.shopName.trim(), shopNameHi: f.shopNameHi.trim(), address: f.address.trim(), phone: f.phone.trim(), upiId: upi, upiName: f.upiName.trim() });
+    await setSettings({ shopName: f.shopName.trim(), shopNameHi: f.shopNameHi.trim(), address: f.address.trim(), phone: f.phone.trim(), ownerPhone: (f.ownerPhone || '').replace(/\D/g, '').slice(-10), upiId: upi, upiName: f.upiName.trim() });
     beep();
     bump();
     say('सेव हुआ · Saved');
@@ -201,6 +201,7 @@ export function Shop() {
       <Field label="Shop name (bill and WhatsApp)" value={f.shopName} onInput={set('shopName')} />
       <Field label="पता · Address" value={f.address} onInput={set('address')} />
       <Field label="फ़ोन · Shop phone" value={f.phone} onInput={set('phone')} mode="numeric" />
+      <Field label="मालिक का WhatsApp · Owner's WhatsApp (day-close summary goes here)" value={f.ownerPhone || ''} onInput={set('ownerPhone')} mode="numeric" />
       <Field label="UPI ID (जैसे naam@okhdfcbank)" value={f.upiId} onInput={set('upiId')} placeholder="name@bank" />
       <Field label="UPI पर दिखने वाला नाम · Name shown in UPI apps" value={f.upiName} onInput={set('upiName')} />
       <p class="note">Mode: {mode.value}. Practice and real keep separate settings, so set this in real mode too.</p>

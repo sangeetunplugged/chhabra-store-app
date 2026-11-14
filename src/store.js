@@ -16,7 +16,8 @@ const PARENT = {
   close: 'today', owner: 'home', shop: 'owner', printer: 'owner', items: 'owner', item: 'items', backup: 'owner', pin: 'owner',
   cloud: 'owner', live: 'home',
   stock: 'home', stockPick: 'stock', stockItem: 'stock', stockCount: 'stock', stockList: 'stock',
-  vendors: 'stock', vendor: 'vendors', vendorEdit: 'vendors'
+  vendors: 'stock', vendor: 'vendors', vendorEdit: 'vendors',
+  accounts: 'home'
 };
 
 export function go(name, p = {}) {
