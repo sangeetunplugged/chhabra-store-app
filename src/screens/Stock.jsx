@@ -378,7 +378,7 @@ function MoveSheet({ it, s, kind, loc: locIn, onClose, onSaved }) {
         <button type="button" class="icon-btn" aria-label="बंद करें · Close" onClick={onClose}><Icon name="x" /></button>
       </div>
       {kind !== 'fill' && (
-        <div class="seg" role="group">
+        <div class="chooser" role="group">
           {(kind === 'in' ? ['home', 'shop'] : ['shop', 'home']).map((p) => (
             <button type="button" key={p} class={place === p ? 'on' : ''} aria-pressed={place === p} onClick={() => setPlace(p)}>
               {p === 'home' ? 'घर · Home' : 'दुकान · Shop'}
@@ -404,7 +404,7 @@ function MoveSheet({ it, s, kind, loc: locIn, onClose, onSaved }) {
         </div>
       )}
       {kind === 'out' && (
-        <div class="seg wrap" role="group" aria-label="क्यों · Why">
+        <div class="chooser wrap" role="group" aria-label="क्यों · Why">
           {Object.entries(REASONS).map(([k, [hi, en]]) => (
             <button type="button" key={k} class={reason === k ? 'on' : ''} aria-pressed={reason === k} onClick={() => setReason(k)}>
               {hi} · {en}
@@ -597,7 +597,7 @@ export function StockList({ view }) {
     const since = sd.firstSaleDay;
     body = (
       <>
-        <div class="seg mx" role="group">
+        <div class="chooser mx" role="group">
           {opts.map((n) => (
             <button type="button" key={n} class={win === n ? 'on' : ''} aria-pressed={win === n} onClick={() => setWin(n)}>{n} दिन · days</button>
           ))}

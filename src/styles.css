@@ -409,11 +409,12 @@ h1, h2, p { margin: 0; }
 .stock-big b { font-size: 34px; font-weight: 800; line-height: 1.1; }
 .stock-big small { color: var(--muted); font-size: 14px; }
 .stock-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.seg { display: flex; gap: 8px; }
-.seg.wrap { flex-wrap: wrap; }
-.seg button { flex: 1; min-height: 48px; padding: 0 12px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card); font-size: 16px; font-weight: 700; }
-.seg.wrap button { flex: 1 1 100%; }
-.seg button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.chooser { display: flex; gap: 8px; }
+.chooser.wrap { flex-wrap: wrap; }
+.chooser button { flex: 1; min-height: 48px; padding: 0 12px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card); font-size: 16px; font-weight: 700; }
+.chooser.wrap button { flex: 1 1 100%; }
+.chooser.half button { flex: 1 1 calc(50% - 4px); }
+.chooser button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 .field.small input { min-height: 48px; font-size: 17px; }
 .rack-tag { flex: none; align-self: center; padding: 2px 8px; border-radius: 8px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 800; }
 .btn.small-btn.green { background: var(--green); color: #fff; border-color: var(--green); }
