@@ -290,6 +290,9 @@ export function Items() {
   return (
     <main class="screen">
       <TopBar title="सामान और दाम" sub={'Items · ' + items.length + ' total · ' + noPrice + ' without price'} onBack={() => go('owner')} right={null} />
+      <div class="top-action">
+        <button type="button" class="btn primary" onClick={() => go('item', { id: '' })}><b>+ नया सामान</b><small>New item</small></button>
+      </div>
       <div class="search-row">
         <label class="search">
           <Icon name="search" size={22} />
@@ -311,9 +314,6 @@ export function Items() {
             <span class={'price' + (it.price == null ? ' none' : '')}>{it.price == null ? 'दाम नहीं' : money(it.price) + (it.loose ? '/kg' : '')}</span>
           </button>
         ))}
-      </div>
-      <div class="bottom-pad">
-        <button type="button" class="btn primary" onClick={() => go('item', { id: '' })}><b>+ नया सामान</b><small>New item</small></button>
       </div>
     </main>
   );

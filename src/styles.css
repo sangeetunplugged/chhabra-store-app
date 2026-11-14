@@ -383,3 +383,5 @@ h1, h2, p { margin: 0; }
 .btn.live-hero .two small { color: #e6f4ea; font-size: 15px; }
 .entries.tight { padding: 0; }
 .bottom-pad .btn { width: 100%; }
+.top-action { padding: 0 16px 10px; }
+.top-action .btn { width: 100%; }
