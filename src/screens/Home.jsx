@@ -3,6 +3,8 @@ import { go, refresh, lines, clearBill } from '../store.js';
 import { heldBills, dropHeld, balances, daySummary, getSettings, mode, memoryOnly } from '../db.js';
 import { money, dayKey, billTotal, timeText } from '../format.js';
 import { Icon, PracticeChip } from '../ui.jsx';
+import { cloud } from '../cloudState.js';
+import { CloudLine } from './Cloud.jsx';
 
 export function Home() {
   const [st, setSt] = useState(null);
@@ -49,6 +51,13 @@ export function Home() {
           </button>
         </div>
       </header>
+
+      {cloud.value.role === 'viewer' && (
+        <button type="button" class="btn live-hero" onClick={() => go('live')}>
+          <Icon name="chart" size={30} />
+          <span class="two"><b>दुकान लाइव</b><small>Shop live · today's real sales and khata from the cloud</small></span>
+        </button>
+      )}
 
       <button type="button" class="btn primary hero" onClick={newBill}>
         <Icon name="plus" size={40} stroke={2.5} />
@@ -102,6 +111,8 @@ export function Home() {
           </span>
         </button>
       </div>
+
+      <CloudLine />
 
       {memoryOnly.value && (
         <p class="warn">यह झलक है: फ़ोन में कुछ सेव नहीं होगा · Preview only: nothing is saved on this device</p>

@@ -5,6 +5,7 @@ import { money, showName } from '../format.js';
 import { Icon, TopBar, Keypad, Sheet, Scanner, Empty } from '../ui.jsx';
 import { btPair, printBill, testBill, beep } from '../printing.js';
 import { shareBackup, restoreBackup } from '../backup.js';
+import { cloud } from '../cloudState.js';
 import { RACKS } from '../racks.js';
 import { searchItems } from './Bill.jsx';
 
@@ -111,6 +112,9 @@ export function Owner() {
         <button type="button" class="row-btn" onClick={() => go('items')}>
           <Icon name="box" size={28} /><span class="two"><b>सामान और दाम</b><small>Items, prices, barcodes, quick tiles</small></span>
         </button>
+        <button type="button" class="row-btn" onClick={() => go('cloud')}>
+          <Icon name="cloud" size={28} /><span class="two"><b>क्लाउड</b><small>Cloud backup and sync · {cloud.value.login ? 'signed in: ' + cloud.value.login : 'not signed in'}</small></span>
+        </button>
         <button type="button" class="row-btn" onClick={() => go('backup')}>
           <Icon name="undo" size={28} /><span class="two"><b>बैकअप</b><small>Send or restore a backup</small></span>
         </button>
@@ -154,7 +158,7 @@ export function Owner() {
   );
 }
 
-function Field({ label, value, onInput, type = 'text', mode: im, placeholder }) {
+export function Field({ label, value, onInput, type = 'text', mode: im, placeholder }) {
   return (
     <label class="field">
       <span>{label}</span>
@@ -163,7 +167,7 @@ function Field({ label, value, onInput, type = 'text', mode: im, placeholder }) 
   );
 }
 
-function useOwnerGuard() {
+export function useOwnerGuard() {
   useEffect(() => {
     if (!ownerOk.value) go('owner');
   }, []);

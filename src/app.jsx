@@ -8,13 +8,15 @@ import { Pay, Cash, Upi, Udhaar, Done } from './screens/Pay.jsx';
 import { Khata, Customer, NewCustomer } from './screens/Khata.jsx';
 import { Today, BillView, ReturnNew, Close } from './screens/Today.jsx';
 import { Owner, Shop, Printer, Items, Item, Backup, Pin } from './screens/Owner.jsx';
+import { Cloud, Live } from './screens/Cloud.jsx';
 
 const SCREENS = {
   home: Home, bill: Bill, loose: Loose, quick: Quick, find: Find,
   pay: Pay, cash: Cash, upi: Upi, udhaar: Udhaar, done: Done,
   khata: Khata, customer: Customer, newCustomer: NewCustomer,
   today: Today, billView: BillView, returnNew: ReturnNew, close: Close,
-  owner: Owner, shop: Shop, printer: Printer, items: Items, item: Item, backup: Backup, pin: Pin
+  owner: Owner, shop: Shop, printer: Printer, items: Items, item: Item, backup: Backup, pin: Pin,
+  cloud: Cloud, live: Live
 };
 
 export function App() {

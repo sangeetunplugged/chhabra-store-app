@@ -364,3 +364,21 @@ h1, h2, p { margin: 0; }
   width: min(488px, calc(100% - 32px)); padding: 12px 16px; border-radius: 14px; background: var(--ink); color: #fff;
   font-size: 16px; line-height: 1.35; text-align: center;
 }
+
+/* cloud */
+.cloud-line { display: flex; align-items: flex-start; gap: 8px; margin: 0 16px 12px; padding: 10px 14px; border-radius: 14px; font-size: 15px; line-height: 1.35; }
+.cloud-line svg { flex: none; margin-top: 1px; }
+.cloud-line.ok { background: var(--green-tint); color: var(--green-ink); }
+.cloud-line.busy { background: var(--blue-tint); color: var(--blue); }
+.cloud-line.wait { background: #fef3c7; color: var(--amber-ink); }
+.cloud-line.bad { background: var(--red-tint); color: var(--red); }
+.home .cloud-line, .pad-screen .cloud-line, .cloud-line.inset { margin: 0; }
+.card { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 18px; background: var(--card); border: 1.5px solid var(--line); }
+.card > small, .card .two small { color: var(--muted2); font-size: 15px; line-height: 1.4; }
+.card .two b, .card > b { font-size: 19px; }
+.warn-card { background: var(--brown-tint); border-color: #fdba74; }
+.bad-card { background: var(--red-tint); border-color: #fca5a5; }
+.btn.live-hero { flex-direction: row; justify-content: flex-start; gap: 14px; min-height: 84px; background: var(--green); color: #fff; border-radius: 20px; padding: 10px 18px; }
+.btn.live-hero .two b { font-size: 24px; }
+.btn.live-hero .two small { color: #e6f4ea; font-size: 15px; }
+.entries.tight { padding: 0; }

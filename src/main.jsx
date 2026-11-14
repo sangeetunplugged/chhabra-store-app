@@ -6,6 +6,7 @@ import '@fontsource/mukta/800.css';
 import './styles.css';
 import { App } from './app.jsx';
 import { useMemoryDb } from './db.js';
+import { resumeCloud } from './cloudState.js';
 
 function storageWorks() {
   return new Promise((resolve) => {
@@ -29,11 +30,13 @@ function storageWorks() {
 }
 
 async function start() {
-  if (!(await storageWorks())) {
+  const idbBlocked = !(await storageWorks());
+  if (idbBlocked) {
     const fake = await import('fake-indexeddb');
     useMemoryDb({ indexedDB: fake.indexedDB, IDBKeyRange: fake.IDBKeyRange });
   }
   render(<App />, document.getElementById('app'));
+  if (!idbBlocked) resumeCloud();
 }
 
 start();

@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Only the shop's own logins, which Rajan creates in the Firebase console (sign-ups are blocked).
+    function shopLogin() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email.matches('[a-z0-9._-]+@chhabra-store[.]firebaseapp[.]com');
+    }
+    // Only the counter login writes: it uploads the shop phone's real data.
+    function counter() {
+      return shopLogin() && request.auth.token.email == 'counter@chhabra-store.firebaseapp.com';
+    }
+    match /shops/chhabra/{document=**} {
+      allow read: if shopLogin();
+      allow write: if counter();
+    }
+  }
+}
