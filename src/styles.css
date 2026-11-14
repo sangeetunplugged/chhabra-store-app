@@ -421,3 +421,18 @@ h1, h2, p { margin: 0; }
 .small { font-size: 13px; }
 .btn.live-hero.stock-hero { background: var(--blue); }
 .btn.live-hero.stock-hero .two small { color: var(--blue-tint); }
+
+/* suppliers */
+.stock-big.one { grid-template-columns: 1fr; }
+.sum-row.sub { min-height: 40px; font-size: 15px; font-weight: 600; color: var(--muted2); padding-left: 28px; }
+.bill-photo { width: 100%; border-radius: 12px; border: 1px solid var(--line); background: #fff; }
+.bill-photo.small { max-height: 180px; object-fit: contain; }
+.photo-btn { position: relative; overflow: hidden; }
+.photo-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.search-row.flush { padding: 0; }
+.chips-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); font-size: 15px; font-weight: 600; }
+.vendor-group { margin-bottom: 6px; }
+.group-head { display: flex; align-items: center; gap: 10px; padding: 6px 16px; }
+.group-head .two { flex: 1; }
+a.btn { text-decoration: none; color: inherit; }

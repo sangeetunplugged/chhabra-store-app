@@ -57,7 +57,20 @@ Data lives on the phone (IndexedDB), so billing never waits for the internet. On
   - All stock: shop and home for every item, with stock value, 30-day sales, margin and days of stock for the chosen category.
 - **On the phone:** each phone keeps a local copy of moves, sales and items (`chhabra-cloudcache`) and fetches only what is new, by server time. Moves made offline are kept by Firestore and sent later.
 - **Start with one full count**, one rack a day. Until an item is counted, its shop number shows **?**.
-- Vendors (vendor khata, purchase bills, payments, rate history) come next as Phase 2, part 2.
+
+## Suppliers (Phase 2, part 2)
+- **Stock → सप्लायर · Vendors:** the list shows what the shop owes in total, what falls due in 3 days or is overdue, whose order day it is today, and each supplier with their balance and next due date. **+ New vendor** sits at the top.
+- **Supplier page:** what the shop owes, unpaid bills with their due dates, and the full khata. From here:
+  - **Purchase bill:** amount, bill number, bill date, pay-within days and a photo of the paper bill (shrunk to under 1 MB and kept in the cloud).
+  - **Payment:** from the galla, other cash, UPI or bank.
+  - **Return** and **Send order** (the low items from this supplier, on their WhatsApp).
+  - Call and WhatsApp buttons, and the items they supply with this supplier's buy rate (✓ marks the cheapest).
+  - Any line can be undone within a day.
+- Payments and returns settle the oldest bill first, so due dates always show what is really unpaid.
+- **Goods in** asks which supplier; the supplier's own item list fills that in automatically. **Stock out → Return to vendor** picks the supplier, suggests the value from their last rate, and adds a return line to their khata.
+- **Item page** compares buy rates by supplier. **Order list** is split by supplier, with a WhatsApp button for each.
+- **Cash paid from the galla** counts in the counter's Today's account and day close, and in Shop live, so the galla still matches.
+- Cloud: `vendors`, `vledger` (khata lines, never edited) and `photos`. Rules: stock and counter logins add these; everyone signed in can read.
 
 ## Code map
 - `src/screens/` – Home, Bill (billing, loose, amount only, item finder), Pay (payment and done), Khata, Today (day, bills, returns, day close), Owner (settings)
@@ -67,5 +80,7 @@ Data lives on the phone (IndexedDB), so billing never waits for the internet. On
 - `src/stockCalc.js` – stock maths and the lists (plain functions, same on every phone)
 - `src/stockState.js` – the phone's copy of stock data, saving moves
 - `src/screens/Stock.jsx` – stock screens: hub, goods in and out, item, counting, lists
+- `src/vendorCalc.js` – what is owed, dues (oldest bill first), buy rates by supplier, galla payouts
+- `src/screens/Vendors.jsx` – supplier list, supplier page and khata, bill with photo, add/edit supplier
 - `src/printing.js` – ESC/POS receipt, Bluetooth and RawBT printing, WhatsApp text, UPI link
 - `src/catalog.json` – the 300 items from the Stock List, with Hindi names and rack codes

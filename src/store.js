@@ -15,7 +15,8 @@ const PARENT = {
   khata: 'home', customer: 'khata', newCustomer: 'khata', today: 'home', billView: 'today', returnNew: 'today',
   close: 'today', owner: 'home', shop: 'owner', printer: 'owner', items: 'owner', item: 'items', backup: 'owner', pin: 'owner',
   cloud: 'owner', live: 'home',
-  stock: 'home', stockPick: 'stock', stockItem: 'stock', stockCount: 'stock', stockList: 'stock'
+  stock: 'home', stockPick: 'stock', stockItem: 'stock', stockCount: 'stock', stockList: 'stock',
+  vendors: 'stock', vendor: 'vendors', vendorEdit: 'vendors'
 };
 
 export function go(name, p = {}) {

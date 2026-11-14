@@ -10,6 +10,7 @@ import { Today, BillView, ReturnNew, Close } from './screens/Today.jsx';
 import { Owner, Shop, Printer, Items, Item, Backup, Pin } from './screens/Owner.jsx';
 import { Cloud, Live } from './screens/Cloud.jsx';
 import { Stock, StockPick, StockItem, StockCount, StockList } from './screens/Stock.jsx';
+import { Vendors, Vendor, VendorEdit } from './screens/Vendors.jsx';
 
 const SCREENS = {
   home: Home, bill: Bill, loose: Loose, quick: Quick, find: Find,
@@ -18,7 +19,8 @@ const SCREENS = {
   today: Today, billView: BillView, returnNew: ReturnNew, close: Close,
   owner: Owner, shop: Shop, printer: Printer, items: Items, item: Item, backup: Backup, pin: Pin,
   cloud: Cloud, live: Live,
-  stock: Stock, stockPick: StockPick, stockItem: StockItem, stockCount: StockCount, stockList: StockList
+  stock: Stock, stockPick: StockPick, stockItem: StockItem, stockCount: StockCount, stockList: StockList,
+  vendors: Vendors, vendor: Vendor, vendorEdit: VendorEdit
 };
 
 export function App() {

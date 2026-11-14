@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'preact/hooks';
 import { go, say } from '../store.js';
 import { cloud } from '../cloudState.js';
-import { stockData, stockCat, ensureStock, saveMove, findByCode, CATS, catLabel, qtyText, unit } from '../stockState.js';
+import { stockData, stockCat, ensureStock, saveMove, saveVEntry, findByCode, CATS, catLabel, qtyText, unit } from '../stockState.js';
+import { DUE_SOON } from '../vendorCalc.js';
 import { lists, summary, empty, WALK } from '../stockCalc.js';
 import { Icon, TopBar, Empty, Sheet, Keypad, Scanner } from '../ui.jsx';
 import { searchItems } from './Bill.jsx';
@@ -12,7 +13,7 @@ import { RACKS, rackText } from '../racks.js';
 import { beep, openWhatsApp } from '../printing.js';
 
 const signedIn = () => !!cloud.value.login && !['signedout', 'off'].includes(cloud.value.status);
-const canEdit = () => ['stock', 'counter'].includes(cloud.value.role);
+export const canEdit = () => ['stock', 'counter'].includes(cloud.value.role);
 const REASONS = {
   vendor: ['वापस सप्लायर को', 'Return to vendor'],
   expired: ['खराब / एक्सपायर', 'Damaged or expired'],
@@ -27,7 +28,7 @@ const KIND = {
   undo: ['वापस लिया', 'Undone']
 };
 
-function useStock() {
+export function useStock() {
   const on = signedIn();
   useEffect(() => {
     if (on) ensureStock();
@@ -35,7 +36,7 @@ function useStock() {
   return { on, sd: stockData.value };
 }
 
-function NeedCloud({ title }) {
+export function NeedCloud({ title }) {
   return (
     <main class="screen pad-screen">
       <TopBar title={title || 'स्टॉक'} sub="Stock" onBack={() => go('home')} right={null} />
@@ -107,6 +108,12 @@ function ItemRows({ list, st, onPick }) {
   ));
 }
 
+function dueCount(sd) {
+  let n = 0;
+  for (const x of sd.V.values()) if (x.v.active !== false) n += x.unpaid.filter((b) => b.days <= DUE_SOON).length;
+  return n;
+}
+
 function activeItems(sd) {
   return [...sd.items.values()].filter((it) => it.active !== false);
 }
@@ -161,7 +168,7 @@ export function Stock() {
               {role !== 'counter' && tile('expiry', 'एक्सपायरी नज़दीक', 'Expiring soon', L.expiry.length || null, false, () => go('stockList', { view: 'expiry' }))}
               {role !== 'counter' && tile('hot', 'ज़्यादा बिकने वाले', 'Hot sellers', null, false, () => go('stockList', { view: 'hot' }))}
               {role !== 'counter' && tile('slow', 'नहीं बिक रहा', 'Not selling', L.slow30.length || null, false, () => go('stockList', { view: 'slow' }))}
-              {role !== 'counter' && tile('vendors', 'सप्लायर', 'Vendors · coming next', null, false, null)}
+              {role !== 'counter' && tile('vendors', 'सप्लायर', 'Vendors · khata, bills, orders', dueCount(sd) || null, false, () => go('vendors'))}
             </div>
           )}
           {L && role !== 'counter' && L.uncounted > 0 && (
@@ -285,6 +292,12 @@ export function StockItem({ id, act, from, loc }) {
         <div class="sum-row"><span>30 दिन में बिका · Sold 30 days</span><b>{qtyText(s.sold30, it)}</b></div>
         <div class="sum-row"><span>आखिरी बिक्री · Last sold</span><b>{s.lastSale ? dateText(s.lastSale + 'T12:00:00') : '—'}</b></div>
         <div class="sum-row"><span>खरीद दाम · Buy rate</span><b>{s.cost ? money(s.cost) : '—'}</b></div>
+        {rateRows(sd, id).map((r) => (
+          <div key={r.vendor || 'none'} class="sum-row sub">
+            <span>{r.name}{r.best ? ' · सबसे सस्ता · best' : ''}</span>
+            <b class={r.best ? 'green-text' : ''}>{money(r.cost)}</b>
+          </div>
+        ))}
         <div class="sum-row"><span>बेचने का दाम · Selling price</span><b>{it.price ? money(it.price) : '—'}</b></div>
       </div>
       {edit && (
@@ -324,6 +337,14 @@ export function StockItem({ id, act, from, loc }) {
   );
 }
 
+function rateRows(sd, id) {
+  const r = sd.rates.get(id);
+  if (!r || r.size < 2) return [];
+  const rows = [...r.values()].map((x) => ({ ...x, name: x.vendor ? (sd.vendors.find((v) => v.id === x.vendor) || { name: '?' }).name : 'बिना सप्लायर · no vendor' }));
+  const best = Math.min(...rows.map((x) => x.cost));
+  return rows.map((x) => ({ ...x, best: x.cost === best })).sort((a, b) => a.cost - b.cost);
+}
+
 // One sheet for every kind of move: a big number pad plus the few choices each kind needs.
 function MoveSheet({ it, s, kind, loc: locIn, onClose, onSaved }) {
   const fillTake = (() => {
@@ -336,6 +357,10 @@ function MoveSheet({ it, s, kind, loc: locIn, onClose, onSaved }) {
   const [expiry, setExpiry] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const sd = stockData.value;
+  const vendors = sd.vendors.filter((x) => x.active !== false);
+  const [vendor, setVendor] = useState(sd.itemVendor.get(it.id) || '');
+  const [value, setValue] = useState('');
   const n = toInt(v);
   const u = unit(it) === 'kg' ? 'kg' : 'pcs';
   const T = {
@@ -344,17 +369,27 @@ function MoveSheet({ it, s, kind, loc: locIn, onClose, onSaved }) {
     fill: ['शेल्फ भरो', 'Home → shelf: how many?'],
     count: ['गिनती', 'Count: how many are there?']
   }[kind];
-  const ok = kind === 'count' ? v !== '' : n > 0 && (kind !== 'out' || reason);
+  const backToVendor = kind === 'out' && reason === 'vendor';
+  const rateFor = (vid) => {
+    const r = sd.rates.get(it.id);
+    const x = r && (r.get(vid) || null);
+    return x ? x.cost : s.cost || 0;
+  };
+  const retValue = value !== '' ? toInt(value) : n * rateFor(vendor);
+  const ok = kind === 'count' ? v !== '' : n > 0 && (kind !== 'out' || reason) && (!backToVendor || vendor);
 
   async function save() {
     if (!ok || busy) return;
     setBusy(true);
     if (kind === 'in') {
       const c = toInt(cost);
-      await saveMove({ kind: 'in', item: it.id, qty: n, to: place, d: { [place]: n }, ...(c > 0 ? { cost: c } : {}), ...(expiry ? { expiry } : {}) });
+      await saveMove({ kind: 'in', item: it.id, qty: n, to: place, d: { [place]: n }, ...(c > 0 ? { cost: c } : {}), ...(expiry ? { expiry } : {}), ...(vendor ? { vendor } : {}) });
       onSaved('+' + n + ' ' + (place === 'home' ? 'घर में · at home' : 'दुकान में · in the shop'));
     } else if (kind === 'out') {
-      await saveMove({ kind: 'out', item: it.id, qty: n, from: place, reason, d: { [place]: -n } });
+      const mv = await saveMove({ kind: 'out', item: it.id, qty: n, from: place, reason, d: { [place]: -n }, ...(backToVendor ? { vendor } : {}) });
+      if (backToVendor && retValue > 0) {
+        await saveVEntry({ vendor, kind: 'return', amount: retValue, note: it.en + (it.pack ? ' ' + it.pack : '') + ' × ' + n, ref: mv.id });
+      }
       onSaved('−' + n + ' ' + (place === 'home' ? 'घर से · from home' : 'दुकान से · from the shop'));
     } else if (kind === 'fill') {
       await saveMove({ kind: 'fill', item: it.id, qty: n, d: { shop: n, home: -n } });
@@ -411,6 +446,25 @@ function MoveSheet({ it, s, kind, loc: locIn, onClose, onSaved }) {
             </button>
           ))}
         </div>
+      )}
+      {(kind === 'in' || backToVendor) && vendors.length > 0 && (
+        <div class="chooser wrap half" role="group" aria-label="सप्लायर · Vendor">
+          {kind === 'in' && (
+            <button type="button" class={!vendor ? 'on' : ''} aria-pressed={!vendor} onClick={() => setVendor('')}>— बिना सप्लायर</button>
+          )}
+          {vendors.map((x) => (
+            <button type="button" key={x.id} class={vendor === x.id ? 'on' : ''} aria-pressed={vendor === x.id} onClick={() => setVendor(x.id)}>{x.name}</button>
+          ))}
+        </div>
+      )}
+      {backToVendor && vendors.length === 0 && (
+        <p class="warn">पहले सप्लायर जोड़ें: स्टॉक → सप्लायर · Add the vendor first: Stock → Vendors</p>
+      )}
+      {backToVendor && (
+        <label class="field small">
+          <span>वापसी की कीमत ₹ · Value of the return (lowers what the shop owes)</span>
+          <input inputMode="numeric" value={value === '' ? String(retValue || '') : value} onInput={(e) => setValue(e.currentTarget.value.replace(/\D/g, ''))} />
+        </label>
       )}
       <button type="button" class="btn primary big" disabled={!ok || busy} onClick={save}>
         <b>सेव करें</b>
@@ -506,17 +560,18 @@ export function StockList({ view }) {
   const L = sd.ready ? lists({ items: sd.items, st: sd.st, cat }) : null;
   const edit = canEdit();
 
-  function shareOrder() {
+  function shareOrder(rows, vendor) {
     const lines = ['छाबड़ा स्टोर · Chhabra Store · ऑर्डर ' + dateText(Date.now())];
+    if (vendor) lines.push(vendor.name + ' ji, यह माल भेज दें · Please send:');
     let lastCat = '';
-    for (const r of L.order) {
-      if (r.it.cat !== lastCat) {
+    for (const r of rows) {
+      if (!vendor && r.it.cat !== lastCat) {
         lastCat = r.it.cat;
         lines.push('', r.it.cat + ':');
       }
       lines.push('- ' + showName(r.it) + ' (' + r.it.en + (r.it.pack ? ' ' + r.it.pack : '') + ') × ' + r.qty);
     }
-    openWhatsApp(lines.join('\n'));
+    openWhatsApp(lines.join('\n'), vendor ? vendor.phone : '');
   }
 
   const head = (
@@ -549,25 +604,44 @@ export function StockList({ view }) {
       </div>
     );
   } else if (view === 'order') {
+    const groups = new Map();
+    for (const r of L.order) {
+      const vid = sd.itemVendor.get(r.it.id) || '';
+      if (!groups.has(vid)) groups.set(vid, []);
+      groups.get(vid).push(r);
+    }
+    const order = [...groups.keys()].sort((a, b) => (!a) - (!b));
     body = (
       <>
-        {L.order.length > 0 && (
-          <div class="pad-x">
-            <button type="button" class="btn green" onClick={shareOrder}><Icon name="chat" size={22} /><b>WhatsApp पर भेजें · Send on WhatsApp</b></button>
-          </div>
-        )}
-        <div class="entries">
-          {L.order.length === 0 && <Empty hi="अभी कुछ मंगाना नहीं" en="Nothing running low among counted items" />}
-          {L.order.map((r) => (
-            <button type="button" key={r.it.id} class="entry tap" onClick={() => go('stockItem', { id: r.it.id, from: 'order' })}>
-              <span class="two">
-                <b>{showName(r.it)} {r.it.pack ? <em>{r.it.pack}</em> : null}</b>
-                <small>{r.it.cat} · बचा · left {qtyText(r.have, r.it)}</small>
-              </span>
-              <b>× {r.qty}</b>
-            </button>
-          ))}
-        </div>
+        {L.order.length === 0 && <Empty hi="अभी कुछ मंगाना नहीं" en="Nothing running low among counted items" />}
+        {order.map((vid) => {
+          const vendor = sd.vendors.find((x) => x.id === vid);
+          const rows = groups.get(vid);
+          return (
+            <section key={vid || 'none'} class="vendor-group">
+              <div class="group-head">
+                <span class="two">
+                  <b>{vendor ? vendor.name : 'बिना सप्लायर'}</b>
+                  <small>{(vendor ? vendor.phone || 'no phone' : 'No vendor yet') + ' · ' + rows.length + (rows.length === 1 ? ' item' : ' items')}</small>
+                </span>
+                <button type="button" class="btn small-btn green" onClick={() => shareOrder(rows, vendor)}>
+                  <Icon name="chat" size={18} /> WhatsApp
+                </button>
+              </div>
+              <div class="entries">
+                {rows.map((r) => (
+                  <button type="button" key={r.it.id} class="entry tap" onClick={() => go('stockItem', { id: r.it.id, from: 'order' })}>
+                    <span class="two">
+                      <b>{showName(r.it)} {r.it.pack ? <em>{r.it.pack}</em> : null}</b>
+                      <small>{r.it.cat} · बचा · left {qtyText(r.have, r.it)}</small>
+                    </span>
+                    <b>× {r.qty}</b>
+                  </button>
+                ))}
+              </div>
+            </section>
+          );
+        })}
       </>
     );
   } else if (view === 'expiry') {

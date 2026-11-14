@@ -11,7 +11,7 @@ import {
   signOut as fbSignOut, connectAuthEmulator
 } from 'firebase/auth';
 import {
-  initializeFirestore, connectFirestoreEmulator, doc, getDocFromServer, getDocsFromServer, getDocs, setDoc, collection,
+  initializeFirestore, connectFirestoreEmulator, doc, getDoc, getDocFromServer, getDocsFromServer, getDocs, setDoc, collection,
   query, where, runTransaction, serverTimestamp, onSnapshot, Timestamp, persistentLocalCache, persistentMultipleTabManager
 } from 'firebase/firestore';
 import { firebaseConfig } from './firebase-config.js';
@@ -347,7 +347,7 @@ async function flush() {
 // ---------- reading (Shop live) ----------
 // Calls back with the day's records from the cloud whenever they change. Returns a stop function.
 export function watchDay(day, cb, onError) {
-  const parts = { bills: [], ledger: [], rets: [], close: null, meta: null, openingCash: 0, ready: 0 };
+  const parts = { bills: [], ledger: [], rets: [], vledger: [], close: null, meta: null, openingCash: 0, ready: 0 };
   const emit = () => cb({ ...parts });
   const fail = (e) => onError && onError(errText(e));
   const byDay = (t, k) =>
@@ -360,6 +360,7 @@ export function watchDay(day, cb, onError) {
     byDay('bills', 'bills'),
     byDay('ledger', 'ledger'),
     byDay('returns', 'rets'),
+    byDay('vledger', 'vledger'),
     onSnapshot(doc(fs, SHOP, 'closes', day), (s) => {
       parts.close = s.exists() ? s.data() : null;
       emit();
@@ -399,7 +400,9 @@ export async function watchStock(onData, since) {
   const stops = [
     onSnapshot(q('moves', s.moves), (snap) => onData({ moves: changed(snap, 'id') }), fail),
     onSnapshot(q('sales', s.sales), (snap) => onData({ sales: changed(snap, 'day') }), fail),
-    onSnapshot(q('items', s.items), (snap) => onData({ items: changed(snap, 'id') }), fail)
+    onSnapshot(q('items', s.items), (snap) => onData({ items: changed(snap, 'id') }), fail),
+    onSnapshot(q('vendors', s.vendors), (snap) => onData({ vendors: changed(snap, 'id') }), fail),
+    onSnapshot(q('vledger', s.vledger), (snap) => onData({ vledger: changed(snap, 'id') }), fail)
   ];
   return () => stops.forEach((f) => f());
 }
@@ -408,4 +411,29 @@ export async function watchStock(onData, since) {
 export function addMove(m) {
   const { sat, ...rest } = m;
   return setDoc(doc(fs, SHOP, 'moves', m.id), { ...rest, sat: serverTimestamp() });
+}
+
+// ---------- suppliers ----------
+export function setVendor(v) {
+  const { sat, ...rest } = v;
+  return setDoc(doc(fs, SHOP, 'vendors', v.id), { ...rest, sat: serverTimestamp() });
+}
+
+export function addVEntry(e) {
+  const { sat, ...rest } = e;
+  return setDoc(doc(fs, SHOP, 'vledger', e.id), { ...rest, sat: serverTimestamp() });
+}
+
+export function addPhoto(p) {
+  return setDoc(doc(fs, SHOP, 'photos', p.id), { ...p, sat: serverTimestamp() });
+}
+
+export async function getPhoto(id) {
+  const s = await getDoc(doc(fs, SHOP, 'photos', id));
+  return s.exists() ? s.data().data : '';
+}
+
+// Cash paid to suppliers from the galla on one day (for Shop live).
+export function watchGalla(day, cb) {
+  return onSnapshot(query(collection(fs, SHOP, 'vledger'), where('day', '==', day)), (s) => cb(s.docs.map((x) => x.data())), () => {});
 }

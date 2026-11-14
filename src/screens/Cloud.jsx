@@ -4,6 +4,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { go, say, bump } from '../store.js';
 import { cloud, cloudApi } from '../cloudState.js';
 import { memoryOnly, summarize } from '../db.js';
+import { gallaPaid } from '../vendorCalc.js';
 import { money, dayKey, dateText, timeText, lineName, lineSub, lineTotal } from '../format.js';
 import { Icon, TopBar, Empty, Sheet } from '../ui.jsx';
 import { Field, useOwnerGuard } from './Owner.jsx';
@@ -280,6 +281,8 @@ export function Live({ day: dayParam, back: backTo }) {
   }
 
   const s = data ? summarize({ bills: data.bills, ledger: data.ledger, rets: data.rets, close: data.close, openingCash: data.openingCash }) : null;
+  const galla = data ? gallaPaid(data.vledger || [], day) : 0;
+  if (s) s.expectedCash -= galla;
   const isToday = day === today;
   const owed = (khata || []).filter((x) => (x.balance || 0) > 0).sort((a, b) => b.balance - a.balance);
   const totalDue = owed.reduce((a, x) => a + x.balance, 0);
@@ -322,6 +325,7 @@ export function Live({ day: dayParam, back: backTo }) {
               <div class="sum-row"><span>वापसी · Returns</span><b>− {money(s.returnsCash + s.returnsKhata)}</b></div>
             )}
             {s.cancelled > 0 && <div class="sum-row"><span>रद्द बिल · Cancelled bills</span><b>{s.cancelled}</b></div>}
+            {galla > 0 && <div class="sum-row"><span>सप्लायर को दिए (गल्ले से) · Paid to vendors from the galla</span><b>− {money(galla)}</b></div>}
           </div>
           <div class="galla">
             <span class="two"><b>गल्ले में होने चाहिए</b><small>Cash expected in the galla (with {money(s.opening)} opening)</small></span>

@@ -6,6 +6,18 @@ import { Icon, TopBar, Keypad, Sheet, Empty } from '../ui.jsx';
 import { printBill, billText, openWhatsApp, beep } from '../printing.js';
 import { shareBackup } from '../backup.js';
 import { Receipt } from './Pay.jsx';
+import { cloud } from '../cloudState.js';
+import { stockData, ensureStock } from '../stockState.js';
+import { gallaPaid } from '../vendorCalc.js';
+
+// Cash the brother paid suppliers out of the galla (needs the cloud; 0 without it).
+function useGallaPaid(day) {
+  const on = !!cloud.value.login && !['signedout', 'off'].includes(cloud.value.status);
+  useEffect(() => {
+    if (on) ensureStock();
+  }, [on]);
+  return on && stockData.value.ready ? gallaPaid(stockData.value.vledger, day) : 0;
+}
 
 function shiftDay(day, n) {
   const d = new Date(day + 'T12:00:00');
@@ -28,6 +40,7 @@ export function Today({ day: dayParam }) {
   useEffect(() => {
     daySummary(day).then(setS);
   }, [day, refresh.value, mode.value]);
+  const paidOut = useGallaPaid(day);
 
   const isToday = day === today;
   return (
@@ -52,10 +65,13 @@ export function Today({ day: dayParam }) {
             {s.returnsCash + s.returnsKhata > 0 && (
               <div class="sum-row"><span>वापसी · Returns</span><b>− {money(s.returnsCash + s.returnsKhata)}</b></div>
             )}
+            {paidOut > 0 && (
+              <div class="sum-row"><span>सप्लायर को दिए (गल्ले से) · Paid to vendors from the galla</span><b>− {money(paidOut)}</b></div>
+            )}
           </div>
           <div class="galla">
             <span class="two"><b>गल्ले में होने चाहिए</b><small>Cash expected in the galla (with {money(s.opening)} opening)</small></span>
-            <b>{money(s.expectedCash)}</b>
+            <b>{money(s.expectedCash - paidOut)}</b>
           </div>
           {s.close && (
             <p class={'close-note ' + (s.close.diff === 0 ? 'ok' : 'off')}>
@@ -219,6 +235,7 @@ export function Close() {
   const [counted, setCounted] = useState('');
   const [field, setField] = useState('counted');
   const [saved, setSaved] = useState(false);
+  const paidOut = useGallaPaid(day);
   useEffect(() => {
     daySummary(day).then((r) => {
       setS(r);
@@ -228,12 +245,12 @@ export function Close() {
   }, []);
   if (!s) return <main class="screen" />;
   const open = toInt(opening);
-  const expected = open + s.cash + s.khataCash - s.returnsCash;
+  const expected = open + s.cash + s.khataCash - s.returnsCash - paidOut;
   const c = toInt(counted);
   const diff = c - expected;
 
   async function save() {
-    await saveClose({ day, opening: open, expected, counted: c, diff, at: Date.now() });
+    await saveClose({ day, opening: open, expected, counted: c, diff, paidOut, at: Date.now() });
     await setSettings({ openingCash: open });
     beep(diff === 0);
     bump();

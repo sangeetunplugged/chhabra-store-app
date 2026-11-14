@@ -20,6 +20,20 @@ service cloud.firestore {
       allow read: if shopLogin();
       allow create: if stockWriter() && request.resource.data.by is string && request.resource.data.item is string;
     }
+    // Suppliers: the stock phone (and the counter) keep the supplier list, the supplier khata and bill photos.
+    // Khata lines and photos are never changed afterwards; a mistake is undone with a new line.
+    match /shops/chhabra/vendors/{id} {
+      allow read: if shopLogin();
+      allow create, update: if stockWriter() && request.resource.data.name is string;
+    }
+    match /shops/chhabra/vledger/{id} {
+      allow read: if shopLogin();
+      allow create: if stockWriter() && request.resource.data.vendor is string && request.resource.data.amount is number;
+    }
+    match /shops/chhabra/photos/{id} {
+      allow read: if shopLogin();
+      allow create: if stockWriter() && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
+    }
     match /shops/chhabra/{document=**} {
       allow read: if shopLogin();
       allow write: if counter();
