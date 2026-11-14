@@ -21,8 +21,14 @@ npm run build    # production files in dist/
 ```
 
 ## Put it on the counter phone
+Live app: https://sangeetunplugged.github.io/chhabra-store-app/
+
 Every push to `main` builds the app and publishes it with GitHub Pages (`.github/workflows/deploy.yml`).
-Open the link in Chrome on the phone, then **Add to Home screen**. It then opens like an app and works with no internet.
+1. Open the link in Chrome on the counter phone.
+2. Tap **⋮ → Add to Home screen → Install**.
+3. Open it once with internet. After that it opens like an app and works with no internet.
+
+Updates load by themselves the next time the app is opened with internet. Data on the phone is not touched by updates.
 
 ## Data
 All data stays on the phone (IndexedDB) until the cloud database is connected. Send the backup file every day from **Day close** or **Owner settings → Backup**.
