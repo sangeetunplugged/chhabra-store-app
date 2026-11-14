@@ -145,7 +145,41 @@ export async function markAll() {
         : await d.table(t).toCollection().primaryKeys();
       await mark(d, t, keys);
     }
+    await mark(d, 'sales', await saleDays(d));
   });
+}
+
+// ---------- daily sales per item (for stock) ----------
+async function saleDays(d) {
+  const days = new Set();
+  await d.bills.each((b) => {
+    if (b.status === 'done') days.add(b.day);
+  });
+  return [...days];
+}
+
+export async function markSalesDays() {
+  const d = realDb();
+  await d.transaction('rw', d.bills, d.outbox, async () => {
+    await mark(d, 'sales', await saleDays(d));
+  });
+}
+
+// What each item sold on one day: packs by count, loose items in kg. Amount-only lines have no item.
+export async function salesDoc(d, day) {
+  const bills = await d.bills.where('day').equals(day).toArray();
+  const items = {};
+  let n = 0;
+  for (const b of bills) {
+    if (b.status !== 'done') continue;
+    n++;
+    for (const l of b.lines || []) {
+      if (!l.itemId || l.quick) continue;
+      const q = l.loose ? (Number(l.grams) || 0) / 1000 : Number(l.qty) || 0;
+      items[l.itemId] = Math.round(((items[l.itemId] || 0) + q) * 1000) / 1000;
+    }
+  }
+  return { day, items, bills: n };
 }
 
 // Replace the real data with a copy from the cloud (a new counter phone). Nothing is queued:
@@ -309,6 +343,7 @@ export async function saveBill({ lines, total, pay }) {
     const id = await d.bills.add({ no, at, day, lines, total, pay, status: 'done' });
     await mark(d, 'bills', [id]);
     await mark(d, 'settings', ['billNo']);
+    await mark(d, 'sales', [day]);
     if (pay.udhaar > 0 && pay.customerId) {
       const lid = await d.ledger.add({ customerId: pay.customerId, type: 'udhaar', amount: pay.udhaar, billId: id, billNo: no, day, at });
       await mark(d, 'ledger', [lid]);
@@ -336,6 +371,7 @@ export async function cancelBill(id, reason) {
     if (!b || b.status !== 'done') return;
     await d.bills.update(id, { status: 'cancelled', reason, cancelledAt: Date.now() });
     await mark(d, 'bills', [id]);
+    await mark(d, 'sales', [b.day]);
     if (b.pay && b.pay.udhaar > 0 && b.pay.customerId) {
       const lid = await d.ledger.add({
         customerId: b.pay.customerId, type: 'cancel', amount: -b.pay.udhaar, billId: id, billNo: b.no,

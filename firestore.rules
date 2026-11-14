@@ -11,6 +11,15 @@ service cloud.firestore {
     function counter() {
       return shopLogin() && request.auth.token.email == 'counter@chhabra-store.firebaseapp.com';
     }
+    // The stock phone (and the counter) record stock moves. A move is never changed afterwards:
+    // a mistake is put right with a new move.
+    function stockWriter() {
+      return shopLogin() && request.auth.token.email in ['stock@chhabra-store.firebaseapp.com', 'counter@chhabra-store.firebaseapp.com'];
+    }
+    match /shops/chhabra/moves/{id} {
+      allow read: if shopLogin();
+      allow create: if stockWriter() && request.resource.data.by is string && request.resource.data.item is string;
+    }
     match /shops/chhabra/{document=**} {
       allow read: if shopLogin();
       allow write: if counter();

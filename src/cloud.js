@@ -11,17 +11,24 @@ import {
   signOut as fbSignOut, connectAuthEmulator
 } from 'firebase/auth';
 import {
-  initializeFirestore, connectFirestoreEmulator, doc, getDoc, getDocs, setDoc, collection, query, where,
-  runTransaction, serverTimestamp, onSnapshot
+  initializeFirestore, connectFirestoreEmulator, doc, getDocFromServer, getDocsFromServer, getDocs, setDoc, collection,
+  query, where, runTransaction, serverTimestamp, onSnapshot, Timestamp, persistentLocalCache, persistentMultipleTabManager
 } from 'firebase/firestore';
 import { firebaseConfig } from './firebase-config.js';
-import { realDb, onOutbox, markAll, replaceReal, SYNC_TABLES, NUMBER_KEYS, customerBalance, setMode } from './db.js';
+import { realDb, onOutbox, markAll, markSalesDays, replaceReal, salesDoc, SYNC_TABLES, NUMBER_KEYS, customerBalance, setMode } from './db.js';
 import { cloud, LOGIN_KEY, DOMAIN, roleOf } from './cloudState.js';
 
 const SHOP = 'shops/chhabra';
 const app = initializeApp(firebaseConfig);
 const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
-const fs = initializeFirestore(app, {}); // memory cache: the outbox in IndexedDB is the durable queue
+// Firestore keeps its own copy on the phone, so stock moves made offline are kept and sent later.
+// The counter's uploads still go through the outbox in the shop database.
+let fs;
+try {
+  fs = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+} catch (e) {
+  fs = initializeFirestore(app, {});
+}
 if (import.meta.env.VITE_FIREBASE_EMULATOR) {
   const host = import.meta.env.VITE_FIREBASE_EMULATOR;
   connectAuthEmulator(auth, 'http://' + host + ':9099', { disableWarnings: true });
@@ -147,6 +154,14 @@ export async function start() {
   }
   clearInterval(beat);
   beat = setInterval(() => schedule(0, true), 10 * 60 * 1000);
+  try {
+    if (localStorage.getItem('chhabra-sales-v1') !== '1') {
+      await markSalesDays();
+      localStorage.setItem('chhabra-sales-v1', '1');
+    }
+  } catch (e) {
+    /* sales days go up with the next bills */
+  }
   set({ pending: await realDb().outbox.count() });
   await counterCheck();
 }
@@ -174,7 +189,7 @@ const claiming = () => {
 async function counterCheck() {
   clearTimeout(retry);
   try {
-    const m = await getDoc(metaRef());
+    const m = await getDocFromServer(metaRef());
     counterKnown = true;
     if (!m.exists()) {
       await claim(false); // the first counter phone: upload everything it has
@@ -224,9 +239,9 @@ export async function claim(fromCloud) {
 async function pullAll() {
   const out = {};
   for (const t of SYNC_TABLES) {
-    const snap = await getDocs(collection(fs, SHOP, t));
+    const snap = await getDocsFromServer(collection(fs, SHOP, t));
     out[t] = snap.docs.map((d) => {
-      const x = d.data();
+      const { sat, ...x } = d.data();
       if (t === 'settings') return { key: d.id, value: x.value };
       if (t === 'customers') {
         const { balance, ...rest } = x;
@@ -256,6 +271,7 @@ function schedule(ms = 400, heartbeat = false) {
 }
 
 async function toDoc(d, t, rec) {
+  if (t === 'sales') return salesDoc(d, rec.day);
   if (t === 'settings') return { value: rec.value === undefined ? null : rec.value };
   const x = JSON.parse(JSON.stringify(rec)); // Firestore takes no undefined values
   if (t === 'customers') x.balance = await customerBalance(d, rec.id);
@@ -288,7 +304,7 @@ async function flush() {
       const docs = [];
       for (const r of uniq.values()) {
         const key = NUMBER_KEYS.has(r.table) ? Number(r.key) : r.key;
-        const rec = await d.table(r.table).get(key);
+        const rec = r.table === 'sales' ? { day: r.key } : await d.table(r.table).get(key);
         const keep = rec && !(r.table === 'bills' && rec.status === 'held');
         docs.push({ ref: doc(fs, SHOP, r.table, r.key), data: keep ? await toDoc(d, r.table, rec) : null });
       }
@@ -300,7 +316,7 @@ async function flush() {
           err.code = 'moved';
           throw err;
         }
-        docs.forEach(({ ref, data }) => (data ? tx.set(ref, data) : tx.delete(ref)));
+        docs.forEach(({ ref, data }) => (data ? tx.set(ref, { ...data, sat: serverTimestamp() }) : tx.delete(ref)));
         tx.set(metaRef(), { lastSync: serverTimestamp(), pending: left, label: LABEL }, { merge: true });
       });
       beatDue = false;
@@ -364,4 +380,32 @@ export function watchDay(day, cb, onError) {
 export async function khataList() {
   const s = await getDocs(collection(fs, SHOP, 'customers'));
   return s.docs.map((x) => x.data());
+}
+
+// ---------- stock: moves, daily sales and items ----------
+// The document's own id is the key on the phone, so an odd document can never block the others.
+function norm(d, key) {
+  const x = d.data({ serverTimestamps: 'none' });
+  return { ...x, [key]: d.id, sat: millis(x.sat) };
+}
+
+// Listens for anything newer (by server time) than what this phone already keeps, and hands it over.
+export async function watchStock(onData, since) {
+  const s = await since();
+  const q = (col, t) =>
+    t ? query(collection(fs, SHOP, col), where('sat', '>', Timestamp.fromMillis(Math.max(0, t - 120000)))) : collection(fs, SHOP, col);
+  const changed = (snap, key) => snap.docChanges().filter((c) => c.type !== 'removed').map((c) => norm(c.doc, key));
+  const fail = () => {};
+  const stops = [
+    onSnapshot(q('moves', s.moves), (snap) => onData({ moves: changed(snap, 'id') }), fail),
+    onSnapshot(q('sales', s.sales), (snap) => onData({ sales: changed(snap, 'day') }), fail),
+    onSnapshot(q('items', s.items), (snap) => onData({ items: changed(snap, 'id') }), fail)
+  ];
+  return () => stops.forEach((f) => f());
+}
+
+// A stock move never changes once made; Firestore keeps it on the phone until it reaches the cloud.
+export function addMove(m) {
+  const { sat, ...rest } = m;
+  return setDoc(doc(fs, SHOP, 'moves', m.id), { ...rest, sat: serverTimestamp() });
 }

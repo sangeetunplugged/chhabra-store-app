@@ -52,6 +52,12 @@ export function Home() {
         </div>
       </header>
 
+      {cloud.value.role === 'stock' && (
+        <button type="button" class="btn live-hero stock-hero" onClick={() => go('stock')}>
+          <Icon name="box" size={30} />
+          <span class="two"><b>स्टॉक</b><small>Stock · goods in, shelves, counts, orders</small></span>
+        </button>
+      )}
       {cloud.value.role === 'viewer' && (
         <button type="button" class="btn live-hero" onClick={() => go('live')}>
           <Icon name="chart" size={30} />
@@ -103,7 +109,7 @@ export function Home() {
             <b>{today ? money(today.total) : ''}</b>
           </span>
         </button>
-        <button type="button" class="row-btn" onClick={() => go('find')}>
+        <button type="button" class="row-btn" onClick={() => go(cloud.value.login && cloud.value.status !== 'signedout' ? 'stock' : 'find')}>
           <Icon name="box" size={32} color="#1E40AF" />
           <span class="two">
             <b>स्टॉक</b>

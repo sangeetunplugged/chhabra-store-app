@@ -22,7 +22,8 @@ function storageWorks() {
       };
       req.onerror = () => resolve(false);
       req.onblocked = () => resolve(true);
-      setTimeout(() => resolve(false), 1500);
+      // A slow phone can take a while to open storage: that is not a block, so keep the real database.
+      setTimeout(() => resolve(true), 5000);
     } catch (e) {
       resolve(false);
     }

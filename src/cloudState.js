@@ -8,7 +8,8 @@ export const DOMAIN = 'chhabra-store.firebaseapp.com'; // logins are <name>@ thi
 // status: off | starting | ok | sending | offline | error | claim | moved | signedout
 export const cloud = signal({ status: 'off', login: '', role: '', pending: 0, lastSync: 0, msg: '', other: null });
 
-export const roleOf = (login) => (login === 'counter' ? 'counter' : 'viewer');
+// counter: the shop phone, uploads · stock: the brother's phone, records stock · anyone else: view only
+export const roleOf = (login) => (login === 'counter' ? 'counter' : login === 'stock' ? 'stock' : 'viewer');
 
 export function savedLogin() {
   try {

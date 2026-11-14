@@ -45,10 +45,27 @@ Data lives on the phone (IndexedDB), so billing never waits for the internet. On
 - `firestore.rules`: shop logins can read; only `counter` can write. Publish them from the console (Firestore → Rules) or with `firebase deploy --only firestore:rules`.
 - To test against the Firebase emulators, build with `VITE_FIREBASE_EMULATOR=127.0.0.1 npx vite build --outDir dist-emu` and run `firebase emulators:start --only auth,firestore`.
 
+## Stock (Phase 2, part 1)
+- **Who does what:** the brother's phone signs in as `stock`. It records goods in (with buy rate and expiry), fills shelves from home, does counts rack by rack, and takes goods out (return to vendor, damaged or expired, used at home). The counter phone's **स्टॉक** button shows search and Fill shelves. Rajan's phone sees every list, read-only.
+- **How the numbers work:** every change is a stock move (`shops/chhabra/moves`), and a move is never edited; a mistake is undone with a new move. The counter phone uploads what each item sold per day (`shops/chhabra/sales/{day}`). Shop stock is all shop moves minus everything sold, and home stock is all home moves. A count records the difference from what the app expected, so after a count the number is exactly what was counted.
+- **Lists:**
+  - Fill shelves: items below their shop target, in walking order R1→R4, B1→B2, L2→L1, then the counter, freezer and others.
+  - Order list: items at half their shop + home target or less, sendable on WhatsApp.
+  - Expiring soon: 30 days ahead, or 2 days for dairy, bread and eggs, counted first in, first out.
+  - Hot sellers: top 20 over 7 or 30 days.
+  - Not selling: no sale in 30 or 60 days; seasonal items are left out.
+  - All stock: shop and home for every item, with stock value, 30-day sales, margin and days of stock for the chosen category.
+- **On the phone:** each phone keeps a local copy of moves, sales and items (`chhabra-cloudcache`) and fetches only what is new, by server time. Moves made offline are kept by Firestore and sent later.
+- **Start with one full count**, one rack a day. Until an item is counted, its shop number shows **?**.
+- Vendors (vendor khata, purchase bills, payments, rate history) come next as Phase 2, part 2.
+
 ## Code map
 - `src/screens/` – Home, Bill (billing, loose, amount only, item finder), Pay (payment and done), Khata, Today (day, bills, returns, day close), Owner (settings)
 - `src/db.js` – local database, practice and real, with the upload outbox
 - `src/cloud.js`, `src/cloudState.js` – Firebase sign-in, upload, counter hand-over, Shop live reads (loaded only when used)
 - `src/screens/Cloud.jsx` – Cloud settings, the status line on Home, Shop live
+- `src/stockCalc.js` – stock maths and the lists (plain functions, same on every phone)
+- `src/stockState.js` – the phone's copy of stock data, saving moves
+- `src/screens/Stock.jsx` – stock screens: hub, goods in and out, item, counting, lists
 - `src/printing.js` – ESC/POS receipt, Bluetooth and RawBT printing, WhatsApp text, UPI link
 - `src/catalog.json` – the 300 items from the Stock List, with Hindi names and rack codes
