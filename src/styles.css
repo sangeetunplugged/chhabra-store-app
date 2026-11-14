@@ -290,7 +290,7 @@ h1, h2, p { margin: 0; }
 .entry .two b { font-size: 17px; font-weight: 600; }
 .entry > b { font-size: 18px; white-space: nowrap; }
 .entry.cancelled { opacity: 0.55; text-decoration: line-through; }
-.bottom-pad { padding: 10px 16px 18px; margin-top: auto; }
+.bottom-pad { padding: 14px 16px 18px; margin-top: auto; position: sticky; bottom: 0; z-index: 2; background: linear-gradient(rgba(247, 245, 239, 0), var(--ground) 24px); }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field > span { font-size: 15px; font-weight: 600; color: var(--muted2); }
 .field input, .field select { min-height: 52px; padding: 0 12px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--card); font-size: 19px; }
@@ -382,3 +382,4 @@ h1, h2, p { margin: 0; }
 .btn.live-hero .two b { font-size: 24px; }
 .btn.live-hero .two small { color: #e6f4ea; font-size: 15px; }
 .entries.tight { padding: 0; }
+.bottom-pad .btn { width: 100%; }
